@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include <stdio.h>
+#include <math.h>
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -50,8 +51,11 @@ uint32_t adcValue;
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 volatile int tirggnum = 0, trig_flag = 0, contador_echo = 0, inicio_echo = 0, distancia = 99999;
-int pH = 3;
-volatile enum {stMedirPlanta, stMedirPH, stMoverTolva} next_state;
+float pH = 3;
+volatile enum {stMedirPlanta, stMedirPH, stMoverTolva, stMedirTemperatura, stAdvisorTemperatura, stMedirLuminosidad} next_state;
+const int B = 4275;               // B value of the thermistor
+const int R0 = 100000;
+int temperature, lightPercentaje;
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -119,10 +123,11 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   HAL_TIM_OC_Start_IT(&htim2, TIM_CHANNEL_3);
-  //HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_2);
-  //HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
+  HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_SET);
+  ADC_ChannelConfTypeDef sConfig = {0};
   while (1)
   {
     /*HAL_TIM_Base_Start_IT(&htim11);
@@ -139,28 +144,67 @@ int main(void)
     {
     case stMedirPlanta:
       HAL_TIM_Base_Start_IT(&htim11);
-      HAL_Delay(300);
-      printf("The distance is : %i\r\n", distancia);
+      HAL_Delay(100);
+      //printf("The distance is : %i\r\n", distancia);
       next_state = stMedirPH;
       break;
 
     case stMedirPH:
+      sConfig.Channel = ADC_CHANNEL_0;
+      sConfig.Rank = 1;
+      sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+      HAL_ADC_ConfigChannel(&hadc1, &sConfig);
       HAL_ADC_Start_IT(&hadc1);
       HAL_Delay(100);
-      pH = (adcValue*14)/4095;
-      printf("The ph is: %i\r\n", pH);
+      HAL_ADC_Stop_IT(&hadc1);
+      pH = (adcValue*14.00)/4095.00;
+      //printf("The ph is: %f\r\n", pH);
       next_state = stMoverTolva;
+      break;
+
     
     case stMoverTolva:
-      if (pH > 8) htim5.Instance->CCR2 = 5;
+      if (pH >= 8) htim5.Instance->CCR2 = 5;
       else if (pH< 8 && pH>=7.5) htim5.Instance->CCR2 = 7;
       else if (pH<7.5 && pH>=7) htim5.Instance->CCR2 = 10;
       else if (pH<7 && pH>=6.5) htim5.Instance->CCR2 = 15;
       else if (pH<6.5 && pH>=5.5) htim5.Instance->CCR2 = 17;
       else if (pH<5.5 && pH>=5) htim5.Instance->CCR2 = 20;
       else htim5.Instance->CCR2 = 25; //Ph mas bajo que 5
-      printf("PUlso :%i\r\n", htim5.Instance->CCR2);
+      //printf("PUlso :%i\r\n", htim5.Instance->CCR2);
+      next_state = stMedirTemperatura;
+      break;
+    case stMedirTemperatura:
+      sConfig.Channel = ADC_CHANNEL_4;
+      sConfig.Rank = 1;
+      sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+      HAL_ADC_ConfigChannel(&hadc1, &sConfig);
+      HAL_ADC_Start_IT(&hadc1);
+      HAL_Delay(100);
+      HAL_ADC_Stop_IT(&hadc1);
+      float R = 4095.0/adcValue-1.0;
+      R = R0*R;
+
+      temperature = 1.0/(log(R/R0)/B+1/298.15)-273.15;
+      //printf("The temperature is : %i\r\n", temperature);
+      next_state = stAdvisorTemperatura;
+
+      break;
+    case stAdvisorTemperatura:
+      next_state = stMedirLuminosidad;
+      break;
+    case stMedirLuminosidad:
+      sConfig.Channel = ADC_CHANNEL_6;
+      sConfig.Rank = 1;
+      sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+      HAL_ADC_ConfigChannel(&hadc1, &sConfig);
+      HAL_ADC_Start_IT(&hadc1);
+      HAL_Delay(100);
+      HAL_ADC_Stop_IT(&hadc1);
+      lightPercentaje = (adcValue*100/4095);
+      printf("The LIGht is is : %i\r\n", lightPercentaje);
       next_state = stMedirPlanta;
+      break;
     default:
       break;
     }
@@ -186,6 +230,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim){
   if (htim->Instance == TIM2){
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_RESET);
+    HAL_TIM_OC_Stop_IT(&htim2, TIM_CHANNEL_3);
   }
 }
 
@@ -414,9 +459,9 @@ static void MX_TIM3_Init(void)
 
   /* USER CODE END TIM3_Init 1 */
   htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 9999;
+  htim3.Init.Prescaler = 99;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 65535;
+  htim3.Init.Period = 99;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_PWM_Init(&htim3) != HAL_OK)
@@ -430,7 +475,7 @@ static void MX_TIM3_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;
+  sConfigOC.Pulse = 10;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_LOW;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
@@ -463,9 +508,9 @@ static void MX_TIM4_Init(void)
 
   /* USER CODE END TIM4_Init 1 */
   htim4.Instance = TIM4;
-  htim4.Init.Prescaler = 0;
+  htim4.Init.Prescaler = 99;
   htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim4.Init.Period = 65535;
+  htim4.Init.Period = 99;
   htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_PWM_Init(&htim4) != HAL_OK)
@@ -479,8 +524,8 @@ static void MX_TIM4_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.Pulse = 10;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_LOW;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_4) != HAL_OK)
   {
