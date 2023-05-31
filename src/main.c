@@ -40,6 +40,11 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+
+#define RX_BUFFER_SIZE 2
+#define TX_BUFFER_SIZE 9
+#define ENVIO_SIZE 13
+
 ADC_HandleTypeDef hadc1;
 
 TIM_HandleTypeDef htim2;
@@ -52,10 +57,12 @@ UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 volatile int tirggnum = 0, trig_flag = 0, contador_echo = 0, inicio_echo = 0, distancia = 99999;
 float pH = 3;
-volatile enum {stMedirPlanta, stMedirPH, stMoverTolva, stMedirTemperatura, stAdvisorTemperatura, stMedirLuminosidad, stAumentarLuz, stDisminuirLuz} next_state;
+volatile enum {stMedirPlanta, stMedirPH, stMoverTolva, stMedirTemperatura, stAdvisorTemperatura, stMedirLuminosidad, stAumentarLuz, stDisminuirLuz, stEnvio} next_state;
 const int B = 4275;               // B value of the thermistor
 const int R0 = 100000;
 int temperature, lightPercentaje, hora = 16;
+char rx_buffer[RX_BUFFER_SIZE];
+char tx_buffer[TX_BUFFER_SIZE];
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -129,9 +136,12 @@ int main(void)
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_SET);
   ADC_ChannelConfTypeDef sConfig = {0};
   int periodo3, periodo4;
+  char envioBuffer[ENVIO_SIZE];
+  int roundPh = 0;
   printf("INIT\r\n");
   while (1)
   {
+    HAL_UART_Receive_IT(&huart1, rx_buffer, 2);
     /*HAL_TIM_Base_Start_IT(&htim11);
     HAL_Delay(2000);
     HAL_TIM_Base_Stop_IT(&htim11);
@@ -202,6 +212,7 @@ int main(void)
       HAL_ADC_Stop_IT(&hadc1);
       lightPercentaje = (adcValue*100/4095);
       printf("The LIGht is is : %i\r\n", lightPercentaje);
+      printf("HOra :%i\r\n", hora);
       if (hora >= 20 || hora <= 7){ // Es de noche
         HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_1);
         if (lightPercentaje > 30) next_state = stDisminuirLuz;
@@ -220,7 +231,7 @@ int main(void)
       else htim3.Instance->CCR1 = periodo3+5;
       if (periodo4+5 >= htim4.Instance->ARR) htim4.Instance->CCR4 = htim4.Instance->ARR;
       else htim4.Instance->CCR4 = periodo4+5;
-      next_state = stMedirPlanta;
+      next_state = stEnvio;
       break;
     case stDisminuirLuz:
       periodo3 = htim3.Instance->CCR1, periodo4 = htim4.Instance->CCR4;
@@ -228,10 +239,18 @@ int main(void)
       else htim3.Instance->CCR1 = periodo3-5;
       if (periodo4-5 <= 1) htim4.Instance->CCR4 = 3;
       else htim4.Instance->CCR4 = periodo4-5;
-      next_state = stMedirPlanta;
+      next_state = stEnvio;
       printf("CCR1 : %i\r\n", htim3.Instance->CCR1);
       printf("CCR4 : %i\r\n", htim4.Instance->CCR4);
       break;
+    case stEnvio:
+      roundPh = (int)pH; 
+      sprintf(envioBuffer, "%i\n%i\n%i\n%i", temperature, distancia, lightPercentaje, roundPh);
+      if(HAL_UART_Transmit(&huart1, envioBuffer, ENVIO_SIZE, 1000) == HAL_OK){
+        printf("Transmitiendo datos %s", envioBuffer);
+        HAL_Delay(1000);
+      }
+      next_state = stMedirPlanta;
     default:
       break;
     }
@@ -252,6 +271,13 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
   if(hadc->Instance == hadc1.Instance){    
       adcValue=HAL_ADC_GetValue(&hadc1);
   }
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
+
+  printf("%s\r\n", rx_buffer);
+  hora = atoi(rx_buffer);
+  HAL_UART_Receive_IT(&huart1, rx_buffer, 2);
 }
 
 void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim){
