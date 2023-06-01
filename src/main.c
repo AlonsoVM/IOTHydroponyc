@@ -60,9 +60,10 @@ float pH = 3;
 volatile enum {stMedirPlanta, stMedirPH, stMoverTolva, stMedirTemperatura, stAdvisorTemperatura, stMedirLuminosidad, stAumentarLuz, stDisminuirLuz, stEnvio} next_state;
 const int B = 4275;               // B value of the thermistor
 const int R0 = 100000;
-int temperature, lightPercentaje, hora = 16;
+int temperature, lightPercentaje, hora = 6;
 char rx_buffer[RX_BUFFER_SIZE];
 char tx_buffer[TX_BUFFER_SIZE];
+int medir = 0;
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -139,6 +140,8 @@ int main(void)
   char envioBuffer[ENVIO_SIZE];
   int roundPh = 0;
   printf("INIT\r\n");
+  next_state = stMedirPH;
+
   while (1)
   {
     HAL_UART_Receive_IT(&huart1, rx_buffer, 2);
@@ -152,12 +155,17 @@ int main(void)
     HAL_ADC_Stop_IT(&hadc1);
     printf("Value: %d\r\n",adcValue);
     HAL_Delay(1000);*/
+    if (medir == 1){
+      next_state = stMedirPlanta;
+    }
+
     switch (next_state)
     {
     case stMedirPlanta:
       HAL_TIM_Base_Start_IT(&htim11);
       HAL_Delay(100);
-      //printf("The distance is : %i\r\n", distancia);
+      printf("The distance is : %i\r\n", distancia);
+      medir = 2;
       next_state = stMedirPH;
       break;
 
@@ -217,12 +225,12 @@ int main(void)
         HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_1);
         if (lightPercentaje > 30) next_state = stDisminuirLuz;
         else if (lightPercentaje < 20) next_state = stAumentarLuz;
-        else next_state = stMedirPlanta;
+        else next_state = stEnvio;
       }else { // Es de día
         HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
         if (lightPercentaje > 80) next_state = stDisminuirLuz;
         else if (lightPercentaje < 70) next_state = stAumentarLuz;
-        else next_state = stMedirPlanta;
+        else next_state = stEnvio;
       }
       break;
     case stAumentarLuz:
@@ -245,12 +253,12 @@ int main(void)
       break;
     case stEnvio:
       roundPh = (int)pH; 
-      sprintf(envioBuffer, "%i\n%i\n%i\n%i", temperature, distancia, lightPercentaje, roundPh);
+      sprintf(envioBuffer, "%i,%i,%i,%i", temperature, distancia, lightPercentaje, roundPh);
       if(HAL_UART_Transmit(&huart1, envioBuffer, ENVIO_SIZE, 1000) == HAL_OK){
         printf("Transmitiendo datos %s", envioBuffer);
         HAL_Delay(1000);
       }
-      next_state = stMedirPlanta;
+      next_state = stMedirPH;
     default:
       break;
     }
@@ -277,6 +285,17 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 
   printf("%s\r\n", rx_buffer);
   hora = atoi(rx_buffer);
+
+  if(hora == 12 || hora == 8 || hora == 20){
+    medir = 0;
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_SET);
+    HAL_TIM_OC_Start_IT(&htim2, TIM_CHANNEL_3);
+  }
+
+  if(hora == 21 && medir != 2){
+    medir = 1;
+  }
+
   HAL_UART_Receive_IT(&huart1, rx_buffer, 2);
 }
 
@@ -529,7 +548,7 @@ static void MX_TIM3_Init(void)
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
   sConfigOC.Pulse = 10;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_LOW;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
   {
@@ -578,7 +597,7 @@ static void MX_TIM4_Init(void)
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
   sConfigOC.Pulse = 10;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_LOW;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_4) != HAL_OK)
   {
