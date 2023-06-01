@@ -30,7 +30,7 @@
 /*UART communication related variables*/
 
 HardwareSerial serialUart(2);
-std::string dataLecture;
+String dataLecture = "19,200,8,100";
 char* dataLectureCharArray;
 int temperature;
 int light;
@@ -67,7 +67,7 @@ QueueHandle_t xMutexHour;
 
 void IRAM_ATTR readingInterrupt() {
 
-  String dataLecture = serialUart.readString();
+  dataLecture = serialUart.readString();
   Serial.println(dataLecture);
 }
 
@@ -151,7 +151,7 @@ void vTaskActivateAlarm( void *pvParameters )
     int temp;
 
     xSemaphoreTake(xMutexHour, 2000/portTICK_PERIOD_MS);
-    temp = temperature;
+    //temp = temperature;
     xSemaphoreGive(xMutexHour);
 
     if(temp >= 25 && temp <= 28){
@@ -182,36 +182,41 @@ void vTaskConvertReadData( void *pvParameters )
   pcTaskName = ( char * ) pvParameters;
   for(;;) {
     
-    int temp, lightAux, pHAux;
+    int temp, lightAux, pHAux, altura;
 
     xSemaphoreTake(xMutexHour, 2000/portTICK_PERIOD_MS);
-    temp = temperature;
-    lightAux = light;
-    pHAux = pH;
     dataLectureCharArray = new char[dataLecture.length() + 1];
     std::strcpy(dataLectureCharArray, dataLecture.c_str());
     xSemaphoreGive(xMutexHour);
 
 
-    Serial.printf("Data obtained: %c", dataLectureCharArray);
-
+    Serial.printf("valor de: %s end\r\n", dataLectureCharArray);
     const char* delimiter = ",";
     char* token = strtok(dataLectureCharArray, delimiter);
-
     if(token != NULL){
       if((temp = atoi(token)) == 0) Serial.println("Error converting temperature");
-      else token = strtok(NULL, delimiter);
-
+      else{ 
+        token = strtok(NULL, delimiter);
+        Serial.printf("temp : %i\r\n", temp);
+      }
+      if((altura = atoi(token)) == 0) Serial.println("Error converting hight");
+      else{ 
+        token = strtok(NULL, delimiter);
+        Serial.printf("altura : %i\r\n", altura);
+      }
       if((lightAux = atoi(token)) == 0) Serial.println("Error converting light");
-      else token = strtok(NULL, delimiter);
-
-      if((pHAux = atoi(token)) == 0) Serial.println("Error converting pH");
-      else token = strtok(NULL, delimiter);
+      else{ 
+        token = strtok(NULL, delimiter);
+        Serial.printf("lightAUx : %i\r\n", lightAux);
+      }
+      if((pHAux = atoi(token)) == 0) Serial.println("Error converting light");
+      else{ 
+        token = strtok(NULL, delimiter);
+        Serial.printf("pHAux : %i\r\n", pHAux);
+      }
     }else{
       Serial.println("Error converting data");
     }
-    
-
     vTaskDelay(5000/portTICK_PERIOD_MS);
   }
   vTaskDelete(NULL); // NULL indica que nos referimos a esta tarea
@@ -254,11 +259,11 @@ void app_main(){
   vSemaphoreCreateBinary( xMutexData );
   vSemaphoreCreateBinary( xMutexHour );
 
-  xTaskCreate(vTaskGetHour, "Task Get Hour", 2500, NULL, 3, NULL);
-  xTaskCreate(vTaskSendHour, "Task Send Hour", 2500, NULL, 3, NULL);
-  xTaskCreate(vTaskActivateAlarm, "Task Activate Alarm", 2500, NULL, 2, NULL);
-  xTaskCreate(vTaskPublicData, "Task Public Data", 2500, NULL, 2, NULL);
-  xTaskCreate(vTaskConvertReadData, "Task Convert Read Data", 2500, NULL, 1, NULL);
+  //xTaskCreate(vTaskGetHour, "Task Get Hour", 2500, NULL, 3, NULL);
+  //xTaskCreate(vTaskSendHour, "Task Send Hour", 2500, NULL, 3, NULL);
+  //xTaskCreate(vTaskActivateAlarm, "Task Activate Alarm", 2500, NULL, 2, NULL);
+  //xTaskCreate(vTaskPublicData, "Task Public Data", 2500, NULL, 2, NULL);
+  xTaskCreate(vTaskConvertReadData, "Task Convert Read Data", 5000, NULL, 1, NULL);
 }
 
 void setup() {
@@ -272,8 +277,8 @@ void setup() {
   ledcSetup(buzzerChannel, buzzerFrequency, buzzerResolution);
 
   delay(4000);
-  wifiConnect();
-  mqttConnect();
+  //wifiConnect();
+  //mqttConnect();
 
   app_main();
 }
