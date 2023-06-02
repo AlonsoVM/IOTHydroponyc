@@ -15,6 +15,7 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
+#include <ArduinoJson.h>
 
 #define TXD_PIN (GPIO_NUM_17)
 #define RXD_PIN (GPIO_NUM_16)
@@ -22,8 +23,8 @@
 #define TOPIC_LIGHT "IoTHydroponic/light"
 #define TOPIC_PH "IoTHydroponic/pH"
 #define TOPIC_HEIGHT "IoTHydroponic/height"
-#define BROKER_IP "192.168.0.14"
-#define BROKER_PORT 1883
+#define BROKER_IP "192.168.0.21"
+#define BROKER_PORT 2883
 #define RX_BUFFER_SIZE 13
 #define READINGS_SIZE 4
 #define HIEGHT_READINGS_SIZE 6
@@ -64,8 +65,22 @@ const int buzzerChannel = 0;
 const int buzzerPin = 23;
 const int freqSoundCnst = 255;
 
+/*Mutexes in order to have mutual exclusion when accessing variables*/
+
 QueueHandle_t xMutexData;
 QueueHandle_t xMutexHour;
+
+/*JSON templates*/
+
+DynamicJsonDocument jsonDocTemp(1024);
+DynamicJsonDocument jsonDocLigh(1024);
+DynamicJsonDocument jsonDocPH(1024);
+DynamicJsonDocument jsonDocHeight(1024);
+const char* jsonTempString = "{\"temperatura\":\"0\"}";
+const char* jsonLightString = "{\"por_luz\":\"0\"}";
+const char* jsonPHString = "{\"pH\":\"0\"}";
+const char* jsonHeightString = "{\"crecimiento\":\"0\"}";
+
 
 void IRAM_ATTR readingInterrupt() {
 
@@ -235,11 +250,7 @@ void vTaskPublicData( void * pvParameters ){
   pcTaskName = ( char * ) pvParameters;
   for(;;) {
     
-    char cTemp[READINGS_SIZE];
-    char cLight[READINGS_SIZE];
-    char cPH[READINGS_SIZE];
-    char cHeight[HIEGHT_READINGS_SIZE];
-
+    String sTemp, sLight, sPH, sHeight;
     int temp, lightAux, pHAux, heightAux;
 
     xSemaphoreTake(xMutexHour, 2000/portTICK_PERIOD_MS);
@@ -249,18 +260,23 @@ void vTaskPublicData( void * pvParameters ){
     heightAux = height;
     xSemaphoreGive(xMutexHour);
 
-    sprintf(cTemp, "%d", temp);
-    sprintf(cLight, "%d", lightAux);
-    sprintf(cPH, "%d", pHAux);
-    sprintf(cHeight, "%d", heightAux);
+    jsonDocTemp["temperatura"] = temp;
+    jsonDocLigh["por_luz"] = lightAux;
+    jsonDocPH["pH"] = pHAux;
+    jsonDocHeight["crecimiento"] = heightAux;
 
-    client.publish(TOPIC_TEMP, cTemp);
-    client.publish(TOPIC_LIGHT, cLight);
-    client.publish(TOPIC_PH, cPH);
+    serializeJson(jsonDocTemp, sTemp);
+    serializeJson(jsonDocLigh, sLight);
+    serializeJson(jsonDocPH, sPH);
+    serializeJson(jsonDocHeight, sHeight);
 
-    if(height != 99999) client.publish(TOPIC_HEIGHT, cHeight);
+    client.publish(TOPIC_TEMP, sTemp.c_str());
+    client.publish(TOPIC_LIGHT, sLight.c_str());
+    client.publish(TOPIC_PH, sPH.c_str());
 
-    Serial.printf("Data public %s, %s, %s, %s\r\n", cTemp, cHeight,cLight, cPH);
+    if(height != 99999) client.publish(TOPIC_HEIGHT, sHeight.c_str());
+
+    Serial.printf("Data public %s, %s, %s, %s\r\n", sTemp, sHeight, sLight, sPH);
 
     vTaskDelay(10000/portTICK_PERIOD_MS);
   }

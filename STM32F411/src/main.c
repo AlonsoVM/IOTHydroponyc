@@ -43,7 +43,7 @@
 
 #define RX_BUFFER_SIZE 2
 #define TX_BUFFER_SIZE 9
-#define ENVIO_SIZE 13
+#define ENVIO_SIZE 14
 
 ADC_HandleTypeDef hadc1;
 
@@ -277,8 +277,12 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 
-  printf("%s\r\n", rx_buffer);
-  hora = atoi(rx_buffer);
+  int horaAux = atoi(rx_buffer);
+
+  if(horaAux >= 0 || horaAux <= 24){
+    hora = horaAux;
+    printf("Hora: %s\r\n", rx_buffer);
+  }
 
   if(hora == 12 || hora == 8 || hora == 20){
     medir = 0;
