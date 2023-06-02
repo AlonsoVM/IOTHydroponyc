@@ -1,0 +1,48 @@
+version: "3"
+
+services:
+  nodeInfluxdb:
+    image: influxdb:1.8
+    container_name: influxdb
+    restart: always
+    networks:
+      - mybridge
+    ports:
+      - "8086:8086"
+    
+  nodeBroker:
+    image: eclipse-mosquitto:1.5
+    container_name: broker
+    depends_on:
+      - "nodeInfluxdb"
+    networks:
+      - mybridge
+    ports:
+      - "2883:1883"
+    
+  nodeTelegraf:
+    image: telegraf:1.18
+    container_name: telegraf
+    depends_on:
+      - "nodeBroker"
+    volumes:
+      - ./Telegraf/telegraf.conf:/etc/telegraf/telegraf.conf
+    networks:
+      - mybridge
+
+  nodeGrafana:
+    image: grafana/grafana:6.5.0-ubuntu
+    container_name: grafana
+    volumes:
+      - ./Grafana/provisioning:/etc/grafana/provisioning
+      - ./Grafana/dashboards:/etc/grafana/dashboards
+    networks:
+      - mybridge
+    ports:
+      - "3000:3000"
+    
+    
+networks:
+  mybridge:
+    driver: bridge
+  
