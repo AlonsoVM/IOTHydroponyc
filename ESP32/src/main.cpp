@@ -22,8 +22,8 @@
 #define TOPIC_LIGHT "IoTHydroponic/light"
 #define TOPIC_PH "IoTHydroponic/pH"
 #define TOPIC_HEIGHT "IoTHydroponic/height"
-#define BROKER_IP "192.168.0.21"
-#define BROKER_PORT 2883
+#define BROKER_IP "192.168.0.14"
+#define BROKER_PORT 1883
 #define RX_BUFFER_SIZE 13
 #define READINGS_SIZE 4
 #define HIEGHT_READINGS_SIZE 6
@@ -61,7 +61,7 @@ int hour;
 const int buzzerFrequency = 5000;
 const int buzzerResolution = 8;
 const int buzzerChannel = 0;
-const int buzzerPin = 32;
+const int buzzerPin = 23;
 const int freqSoundCnst = 255;
 
 QueueHandle_t xMutexData;
@@ -120,7 +120,7 @@ void vTaskGetHour( void *pvParameters ){
 
     }else Serial.println("Hour could not be obtained");
     
-    vTaskDelay(5000/portTICK_PERIOD_MS);
+    vTaskDelay(7000/portTICK_PERIOD_MS);
   }
   vTaskDelete(NULL); // NULL indica que nos referimos a esta tarea
 }
@@ -139,7 +139,7 @@ void vTaskSendHour( void *pvParameters ){
       
     }else Serial.println("Hour could not be sent");
   
-    vTaskDelay(5000/portTICK_PERIOD_MS);
+    vTaskDelay(10000/portTICK_PERIOD_MS);
   }
   vTaskDelete(NULL); // NULL indica que nos referimos a esta tarea
 }
@@ -165,7 +165,7 @@ void vTaskActivateAlarm( void *pvParameters )
     } else if (temp > 28){
 
       //Activar alarma
-      ledcWrite(buzzerChannel, freqSoundCnst);
+      ledcWriteTone(buzzerChannel, freqSoundCnst);
       Serial.println("Temperature over 28 degrees");
 
     }else {
@@ -173,7 +173,7 @@ void vTaskActivateAlarm( void *pvParameters )
       Serial.println("NOIF");
     }
 
-    vTaskDelay(5000/portTICK_PERIOD_MS);
+    vTaskDelay(10000/portTICK_PERIOD_MS);
   }
   vTaskDelete(NULL); // NULL indica que nos referimos a esta tarea
 }
@@ -225,7 +225,7 @@ void vTaskConvertReadData( void *pvParameters )
     height = heightAux;
     xSemaphoreGive(xMutexHour);
 
-    vTaskDelay(5000/portTICK_PERIOD_MS);
+    vTaskDelay(1000/portTICK_PERIOD_MS);
   }
   vTaskDelete(NULL); // NULL indica que nos referimos a esta tarea
 }
@@ -262,7 +262,7 @@ void vTaskPublicData( void * pvParameters ){
 
     Serial.printf("Data public %s, %s, %s, %s\r\n", cTemp, cHeight,cLight, cPH);
 
-    vTaskDelay(5000/portTICK_PERIOD_MS);
+    vTaskDelay(10000/portTICK_PERIOD_MS);
   }
   vTaskDelete(NULL); // NULL indica que nos referimos a esta tarea
 }
@@ -274,9 +274,9 @@ void app_main(){
 
   xTaskCreate(vTaskGetHour, "Task Get Hour", 2500, NULL, 3, NULL);
   xTaskCreate(vTaskSendHour, "Task Send Hour", 2500, NULL, 3, NULL);
-  xTaskCreate(vTaskActivateAlarm, "Task Activate Alarm", 2500, NULL, 2, NULL);
+  xTaskCreate(vTaskActivateAlarm, "Task Activate Alarm", 2500, NULL, 1, NULL);
   xTaskCreate(vTaskPublicData, "Task Public Data", 2500, NULL, 2, NULL);
-  xTaskCreate(vTaskConvertReadData, "Task Convert Read Data", 5000, NULL, 1, NULL);
+  xTaskCreate(vTaskConvertReadData, "Task Convert Read Data", 5000, NULL, 2, NULL);
 }
 
 void setup() {
