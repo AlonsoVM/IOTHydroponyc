@@ -21,20 +21,22 @@
 #define TOPIC_TEMP "IoTHydroponic/temperature"
 #define TOPIC_LIGHT "IoTHydroponic/light"
 #define TOPIC_PH "IoTHydroponic/pH"
-#define TOPIC_WARNING "IoTHydroponic/warning" /*Topic where temperature warnings will be sent*/
-#define BROKER_IP "192.168.0.14"
-#define BROKER_PORT 1883
+#define TOPIC_HEIGHT "IoTHydroponic/height"
+#define BROKER_IP "192.168.0.21"
+#define BROKER_PORT 2883
 #define RX_BUFFER_SIZE 13
 #define READINGS_SIZE 4
+#define HIEGHT_READINGS_SIZE 6
 
 /*UART communication related variables*/
 
 HardwareSerial serialUart(2);
-String dataLecture = "19,200,8,100";
+String dataLecture;
 char* dataLectureCharArray;
 int temperature;
 int light;
 int pH;
+int height;
 
 /*WiFi related variables*/
 
@@ -151,7 +153,7 @@ void vTaskActivateAlarm( void *pvParameters )
     int temp;
 
     xSemaphoreTake(xMutexHour, 2000/portTICK_PERIOD_MS);
-    //temp = temperature;
+    temp = temperature;
     xSemaphoreGive(xMutexHour);
 
     if(temp >= 25 && temp <= 28){
@@ -182,41 +184,47 @@ void vTaskConvertReadData( void *pvParameters )
   pcTaskName = ( char * ) pvParameters;
   for(;;) {
     
-    int temp, lightAux, pHAux, altura;
+    int temp, lightAux, pHAux, heightAux;
 
     xSemaphoreTake(xMutexHour, 2000/portTICK_PERIOD_MS);
     dataLectureCharArray = new char[dataLecture.length() + 1];
     std::strcpy(dataLectureCharArray, dataLecture.c_str());
     xSemaphoreGive(xMutexHour);
 
-
-    Serial.printf("valor de: %s end\r\n", dataLectureCharArray);
     const char* delimiter = ",";
     char* token = strtok(dataLectureCharArray, delimiter);
+
     if(token != NULL){
-      if((temp = atoi(token)) == 0) Serial.println("Error converting temperature");
-      else{ 
-        token = strtok(NULL, delimiter);
-        Serial.printf("temp : %i\r\n", temp);
-      }
-      if((altura = atoi(token)) == 0) Serial.println("Error converting hight");
-      else{ 
-        token = strtok(NULL, delimiter);
-        Serial.printf("altura : %i\r\n", altura);
-      }
-      if((lightAux = atoi(token)) == 0) Serial.println("Error converting light");
-      else{ 
-        token = strtok(NULL, delimiter);
-        Serial.printf("lightAUx : %i\r\n", lightAux);
-      }
-      if((pHAux = atoi(token)) == 0) Serial.println("Error converting light");
-      else{ 
-        token = strtok(NULL, delimiter);
-        Serial.printf("pHAux : %i\r\n", pHAux);
-      }
-    }else{
-      Serial.println("Error converting data");
+      temp = atoi(token);
+      token = strtok(NULL, delimiter);
+      Serial.printf("Temp : %i\r\n", temp);
     }
+
+    if(token != NULL){
+      heightAux = atoi(token);
+      token = strtok(NULL, delimiter);
+      Serial.printf("Height : %i\r\n", heightAux);
+    }
+
+    if(token != NULL){
+      lightAux = atoi(token);
+      token = strtok(NULL, delimiter);
+      Serial.printf("Light : %i\r\n", lightAux);
+    }
+
+    if(token != NULL){
+      pHAux = atoi(token);
+      token = strtok(NULL, delimiter);
+      Serial.printf("pH : %i\r\n", pHAux);
+    }
+
+    xSemaphoreTake(xMutexHour, 2000/portTICK_PERIOD_MS);
+    temperature = temp;
+    light = lightAux; 
+    pH = pHAux;
+    height = heightAux;
+    xSemaphoreGive(xMutexHour);
+
     vTaskDelay(5000/portTICK_PERIOD_MS);
   }
   vTaskDelete(NULL); // NULL indica que nos referimos a esta tarea
@@ -230,24 +238,29 @@ void vTaskPublicData( void * pvParameters ){
     char cTemp[READINGS_SIZE];
     char cLight[READINGS_SIZE];
     char cPH[READINGS_SIZE];
+    char cHeight[HIEGHT_READINGS_SIZE];
 
-    int temp, lightAux, pHAux;
+    int temp, lightAux, pHAux, heightAux;
 
     xSemaphoreTake(xMutexHour, 2000/portTICK_PERIOD_MS);
     temp = temperature;
     lightAux = light;
     pHAux = pH;
+    heightAux = height;
     xSemaphoreGive(xMutexHour);
 
     sprintf(cTemp, "%d", temp);
     sprintf(cLight, "%d", lightAux);
     sprintf(cPH, "%d", pHAux);
-
-    Serial.printf("Data sent %c, %c, %c\r\n", cTemp, cLight, cPH);
+    sprintf(cHeight, "%d", heightAux);
 
     client.publish(TOPIC_TEMP, cTemp);
     client.publish(TOPIC_LIGHT, cLight);
     client.publish(TOPIC_PH, cPH);
+
+    if(height != 99999) client.publish(TOPIC_HEIGHT, cHeight);
+
+    Serial.printf("Data public %s, %s, %s, %s\r\n", cTemp, cHeight,cLight, cPH);
 
     vTaskDelay(5000/portTICK_PERIOD_MS);
   }
@@ -259,10 +272,10 @@ void app_main(){
   vSemaphoreCreateBinary( xMutexData );
   vSemaphoreCreateBinary( xMutexHour );
 
-  //xTaskCreate(vTaskGetHour, "Task Get Hour", 2500, NULL, 3, NULL);
-  //xTaskCreate(vTaskSendHour, "Task Send Hour", 2500, NULL, 3, NULL);
-  //xTaskCreate(vTaskActivateAlarm, "Task Activate Alarm", 2500, NULL, 2, NULL);
-  //xTaskCreate(vTaskPublicData, "Task Public Data", 2500, NULL, 2, NULL);
+  xTaskCreate(vTaskGetHour, "Task Get Hour", 2500, NULL, 3, NULL);
+  xTaskCreate(vTaskSendHour, "Task Send Hour", 2500, NULL, 3, NULL);
+  xTaskCreate(vTaskActivateAlarm, "Task Activate Alarm", 2500, NULL, 2, NULL);
+  xTaskCreate(vTaskPublicData, "Task Public Data", 2500, NULL, 2, NULL);
   xTaskCreate(vTaskConvertReadData, "Task Convert Read Data", 5000, NULL, 1, NULL);
 }
 
@@ -275,10 +288,11 @@ void setup() {
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
 
   ledcSetup(buzzerChannel, buzzerFrequency, buzzerResolution);
+  ledcAttachPin(buzzerPin, buzzerChannel);
 
   delay(4000);
-  //wifiConnect();
-  //mqttConnect();
+  wifiConnect();
+  mqttConnect();
 
   app_main();
 }

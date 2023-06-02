@@ -60,7 +60,7 @@ float pH = 3;
 volatile enum {stMedirPlanta, stMedirPH, stMoverTolva, stMedirTemperatura, stAdvisorTemperatura, stMedirLuminosidad, stAumentarLuz, stDisminuirLuz, stEnvio} next_state;
 const int B = 4275;               // B value of the thermistor
 const int R0 = 100000;
-int temperature, lightPercentaje, hora = 6;
+int temperature, lightPercentaje, hora = 0;
 char rx_buffer[RX_BUFFER_SIZE];
 char tx_buffer[TX_BUFFER_SIZE];
 int medir = 0;
@@ -164,7 +164,6 @@ int main(void)
     case stMedirPlanta:
       HAL_TIM_Base_Start_IT(&htim11);
       HAL_Delay(100);
-      printf("The distance is : %i\r\n", distancia);
       medir = 2;
       next_state = stMedirPH;
       break;
@@ -219,15 +218,12 @@ int main(void)
       HAL_Delay(100);
       HAL_ADC_Stop_IT(&hadc1);
       lightPercentaje = (adcValue*100/4095);
-      printf("The LIGht is is : %i\r\n", lightPercentaje);
-      printf("HOra :%i\r\n", hora);
+      printf("Hora :%i\r\n", hora);
       if (hora >= 20 || hora <= 7){ // Es de noche
-        HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_1);
         if (lightPercentaje > 30) next_state = stDisminuirLuz;
         else if (lightPercentaje < 20) next_state = stAumentarLuz;
         else next_state = stEnvio;
       }else { // Es de día
-        HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
         if (lightPercentaje > 80) next_state = stDisminuirLuz;
         else if (lightPercentaje < 70) next_state = stAumentarLuz;
         else next_state = stEnvio;
@@ -248,14 +244,12 @@ int main(void)
       if (periodo4-5 <= 1) htim4.Instance->CCR4 = 3;
       else htim4.Instance->CCR4 = periodo4-5;
       next_state = stEnvio;
-      printf("CCR1 : %i\r\n", htim3.Instance->CCR1);
-      printf("CCR4 : %i\r\n", htim4.Instance->CCR4);
       break;
     case stEnvio:
       roundPh = (int)pH; 
       sprintf(envioBuffer, "%i,%i,%i,%i", temperature, distancia, lightPercentaje, roundPh);
       if(HAL_UART_Transmit(&huart1, envioBuffer, ENVIO_SIZE, 1000) == HAL_OK){
-        printf("Transmitiendo datos %s", envioBuffer);
+        printf("Transmitiendo datos %s\r\n", envioBuffer);
         HAL_Delay(1000);
       }
       next_state = stMedirPH;
@@ -290,6 +284,12 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
     medir = 0;
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_SET);
     HAL_TIM_OC_Start_IT(&htim2, TIM_CHANNEL_3);
+  }
+
+  if (hora >= 20 || hora <= 7){ // Es de noche
+    HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_1);
+  }else { // Es de día
+    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
   }
 
   if(hora == 21 && medir != 2){
