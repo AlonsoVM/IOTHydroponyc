@@ -23,8 +23,8 @@
 #define TOPIC_LIGHT "IoTHydroponic/light"
 #define TOPIC_PH "IoTHydroponic/pH"
 #define TOPIC_HEIGHT "IoTHydroponic/height"
-#define BROKER_IP "192.168.0.21"
-#define BROKER_PORT 2883
+#define BROKER_IP "192.168.0.14"
+#define BROKER_PORT 1883
 #define RX_BUFFER_SIZE 13
 #define READINGS_SIZE 4
 #define HIEGHT_READINGS_SIZE 6
@@ -85,7 +85,7 @@ const char* jsonHeightString = "{\"crecimiento\":\"0\"}";
 void IRAM_ATTR readingInterrupt() {
 
   dataLecture = serialUart.readString();
-  Serial.println(dataLecture);
+
 }
 
 void wifiConnect()
@@ -274,7 +274,7 @@ void vTaskPublicData( void * pvParameters ){
     client.publish(TOPIC_LIGHT, sLight.c_str());
     client.publish(TOPIC_PH, sPH.c_str());
 
-    if(height != 99999) client.publish(TOPIC_HEIGHT, sHeight.c_str());
+    if(heightAux != 99999)client.publish(TOPIC_HEIGHT, sHeight.c_str());
 
     Serial.printf("Data public %s, %s, %s, %s\r\n", sTemp, sHeight, sLight, sPH);
 

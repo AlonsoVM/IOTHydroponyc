@@ -55,7 +55,7 @@ TIM_HandleTypeDef htim11;
 uint32_t adcValue;
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
-volatile int tirggnum = 0, trig_flag = 0, contador_echo = 0, inicio_echo = 0, distancia = 99999;
+volatile int tirggnum = 0, trig_flag = 0, contador_echo = 0, inicio_echo = 0, altura = 99999, distancia = 99999;
 float pH = 3;
 volatile enum {stMedirPlanta, stMedirPH, stMoverTolva, stMedirTemperatura, stAdvisorTemperatura, stMedirLuminosidad, stAumentarLuz, stDisminuirLuz, stEnvio} next_state;
 const int B = 4275;               // B value of the thermistor
@@ -165,6 +165,7 @@ int main(void)
       HAL_TIM_Base_Start_IT(&htim11);
       HAL_Delay(100);
       medir = 2;
+      altura = 500 - distancia;
       next_state = stMedirPH;
       break;
 
@@ -247,7 +248,7 @@ int main(void)
       break;
     case stEnvio:
       roundPh = (int)pH; 
-      sprintf(envioBuffer, "%i,%i,%i,%i", temperature, distancia, lightPercentaje, roundPh);
+      sprintf(envioBuffer, "%i,%i,%i,%i", temperature, altura, lightPercentaje, roundPh);
       if(HAL_UART_Transmit(&huart1, envioBuffer, ENVIO_SIZE, 1000) == HAL_OK){
         printf("Transmitiendo datos %s\r\n", envioBuffer);
         HAL_Delay(1000);
