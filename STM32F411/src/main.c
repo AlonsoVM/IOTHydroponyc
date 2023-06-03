@@ -139,25 +139,13 @@ int main(void)
   int periodo3, periodo4;
   char envioBuffer[ENVIO_SIZE];
   int roundPh = 0;
+
   printf("INIT\r\n");
   next_state = stMedirPH;
 
   while (1)
   {
     HAL_UART_Receive_IT(&huart1, rx_buffer, 2);
-    /*HAL_TIM_Base_Start_IT(&htim11);
-    HAL_Delay(2000);
-    HAL_TIM_Base_Stop_IT(&htim11);
-    /* USER CODE END WHILE */
-    /*ADC_ChannelConfTypeDef sConfig = {0};
-    HAL_ADC_Start_IT(&hadc1);
-    HAL_Delay(1000);
-    HAL_ADC_Stop_IT(&hadc1);
-    printf("Value: %d\r\n",adcValue);
-    HAL_Delay(1000);*/
-    if (medir == 1){
-      next_state = stMedirPlanta;
-    }
 
     switch (next_state)
     {
@@ -178,11 +166,9 @@ int main(void)
       HAL_Delay(100);
       HAL_ADC_Stop_IT(&hadc1);
       pH = (adcValue*14.00)/4095.00;
-      //printf("The ph is: %f\r\n", pH);
       next_state = stMoverTolva;
       break;
 
-    
     case stMoverTolva:
       if (pH >= 8) htim5.Instance->CCR2 = 5;
       else if (pH< 8 && pH>=7.5) htim5.Instance->CCR2 = 7;
@@ -191,9 +177,9 @@ int main(void)
       else if (pH<6.5 && pH>=5.5) htim5.Instance->CCR2 = 17;
       else if (pH<5.5 && pH>=5) htim5.Instance->CCR2 = 20;
       else htim5.Instance->CCR2 = 25; //Ph mas bajo que 5
-      //printf("PUlso :%i\r\n", htim5.Instance->CCR2);
       next_state = stMedirTemperatura;
       break;
+
     case stMedirTemperatura:
       sConfig.Channel = ADC_CHANNEL_4;
       sConfig.Rank = 1;
@@ -204,12 +190,10 @@ int main(void)
       HAL_ADC_Stop_IT(&hadc1);
       float R = 4095.0/adcValue-1.0;
       R = R0*R;
-
       temperature = 1.0/(log(R/R0)/B+1/298.15)-273.15;
-      //printf("The temperature is : %i\r\n", temperature);
       next_state = stMedirLuminosidad;
-
       break;
+
     case stMedirLuminosidad:
       sConfig.Channel = ADC_CHANNEL_6;
       sConfig.Rank = 1;
@@ -219,7 +203,7 @@ int main(void)
       HAL_Delay(100);
       HAL_ADC_Stop_IT(&hadc1);
       lightPercentaje = (adcValue*100/4095);
-      printf("Hora :%i\r\n", hora);
+      
       if (hora >= 20 || hora <= 7){ // Es de noche
         if (lightPercentaje > 30) next_state = stDisminuirLuz;
         else if (lightPercentaje < 20) next_state = stAumentarLuz;
@@ -230,41 +214,50 @@ int main(void)
         else next_state = stEnvio;
       }
       break;
+
     case stAumentarLuz:
       periodo3 = htim3.Instance->CCR1, periodo4 = htim4.Instance->CCR4;
+
       if (periodo3+5 >= htim3.Instance->ARR) htim3.Instance->CCR1 = htim3.Instance->ARR;
       else htim3.Instance->CCR1 = periodo3+5;
       if (periodo4+5 >= htim4.Instance->ARR) htim4.Instance->CCR4 = htim4.Instance->ARR;
       else htim4.Instance->CCR4 = periodo4+5;
+
       next_state = stEnvio;
       break;
+
     case stDisminuirLuz:
       periodo3 = htim3.Instance->CCR1, periodo4 = htim4.Instance->CCR4;
+
       if (periodo3-5 <= 1) htim3.Instance->CCR1 = 3;
       else htim3.Instance->CCR1 = periodo3-5;
       if (periodo4-5 <= 1) htim4.Instance->CCR4 = 3;
       else htim4.Instance->CCR4 = periodo4-5;
+
       next_state = stEnvio;
       break;
+
     case stEnvio:
       roundPh = (int)pH; 
       sprintf(envioBuffer, "%i,%i,%i,%i", temperature, altura, lightPercentaje, roundPh);
+
       if(HAL_UART_Transmit(&huart1, envioBuffer, ENVIO_SIZE, 1000) == HAL_OK){
         printf("Transmitiendo datos %s\r\n", envioBuffer);
         HAL_Delay(1000);
       }
-      next_state = stMedirPH;
+
+      if(medir == 1){
+        next_state = stMedirPlanta;
+      }else{
+        next_state = stMedirPH;
+      } 
+
+      break;
+
     default:
+      next_state = stMedirPH; 
       break;
     }
-  
-    /*htim4.Instance->CCR4 = 5;
-    HAL_Delay(2000);
-    htim4.Instance->CCR4 = 15;
-    HAL_Delay(2000);
-    htim4.Instance->CCR4 = 25;
-    HAL_Delay(2000);*/
-    /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
 }
@@ -282,7 +275,9 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 
   if(horaAux >= 0 || horaAux <= 24){
     hora = horaAux;
-    printf("Hora: %s\r\n", rx_buffer);
+    printf("Hora :%i\r\n", hora);
+  }else{
+    printf("Error al convertir hora\r\n");
   }
 
   if(hora == 12 || hora == 8 || hora == 20){
