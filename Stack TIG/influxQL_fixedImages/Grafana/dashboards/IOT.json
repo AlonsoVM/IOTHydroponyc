@@ -548,32 +548,32 @@
       "rangeMaps": [
         {
           "from": "0",
-          "text": "Tolva totalmente abierta",
+          "text": "Tolva totalmente abierta en el proximo riego",
           "to": "5"
         },
         {
           "from": "5",
-          "text": "Tolva 140º",
+          "text": "Tolva 140º en el proximo riego",
           "to": "5.5"
         },
         {
           "from": "5.5",
-          "text": "Tolva 100º",
+          "text": "Tolva 100º en el proximo riego",
           "to": "6"
         },
         {
           "from": "6.5",
-          "text": "Tolva 90º",
+          "text": "Tolva 90º en el proximo riego",
           "to": "7"
         },
         {
           "from": "7",
-          "text": "Tolva 45º",
+          "text": "Tolva 45º en el proximo riego",
           "to": "7.5"
         },
         {
           "from": "7.5",
-          "text": "Tolva 20º",
+          "text": "Tolva 20º en el proximo riego",
           "to": "8"
         },
         {

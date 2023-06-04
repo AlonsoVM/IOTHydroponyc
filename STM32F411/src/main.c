@@ -63,7 +63,7 @@ const int R0 = 100000;
 int temperature, lightPercentaje, hora = 0;
 char rx_buffer[RX_BUFFER_SIZE];
 char tx_buffer[TX_BUFFER_SIZE];
-int medir = 0;
+int medir = 0, regar = 0;
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -166,7 +166,8 @@ int main(void)
       HAL_Delay(100);
       HAL_ADC_Stop_IT(&hadc1);
       pH = (adcValue*14.00)/4095.00;
-      next_state = stMoverTolva;
+      if (regar == 1)next_state = stMoverTolva;
+      else next_state = stMedirTemperatura;
       break;
 
     case stMoverTolva:
@@ -284,6 +285,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
     medir = 0;
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_SET);
     HAL_TIM_OC_Start_IT(&htim2, TIM_CHANNEL_3);
+    regar = 1;
   }
 
   if (hora >= 20 || hora <= 7){ // Es de noche
@@ -302,6 +304,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim){
   if (htim->Instance == TIM2){
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_RESET);
+    regar = 0;
+    htim5.Instance->CCR2 = 5;
     HAL_TIM_OC_Stop_IT(&htim2, TIM_CHANNEL_3);
   }
 }
