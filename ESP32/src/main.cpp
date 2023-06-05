@@ -23,8 +23,8 @@
 #define TOPIC_LIGHT "IoTHydroponic/light"
 #define TOPIC_PH "IoTHydroponic/pH"
 #define TOPIC_HEIGHT "IoTHydroponic/height"
-#define BROKER_IP "192.168.0.14"
-#define BROKER_PORT 1883
+#define BROKER_IP "192.168.0.21"
+#define BROKER_PORT 2883
 #define RX_BUFFER_SIZE 13
 #define READINGS_SIZE 4
 #define HIEGHT_READINGS_SIZE 6

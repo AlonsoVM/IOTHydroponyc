@@ -64,6 +64,7 @@ int temperature, lightPercentaje, hora = 0;
 char rx_buffer[RX_BUFFER_SIZE];
 char tx_buffer[TX_BUFFER_SIZE];
 int medir = 0, regar = 0;
+int horaAux2 = 0;
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -281,11 +282,12 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
     printf("Error al convertir hora\r\n");
   }
 
-  if(hora == 12 || hora == 8 || hora == 20){
+  if((horaAux2 != hora) && (hora == 12 || hora == 8 || hora == 20)){
     medir = 0;
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_SET);
     HAL_TIM_OC_Start_IT(&htim2, TIM_CHANNEL_3);
     regar = 1;
+    horaAux2 = hora;
   }
 
   if (hora >= 20 || hora <= 7){ // Es de noche
